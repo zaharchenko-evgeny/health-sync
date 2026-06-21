@@ -50,11 +50,13 @@ class Settings:
     strava_token_file: Path | None
     strava_weight_threshold_kg: float
 
-    serve_interval_minutes: int
+    zepp_cron: str
+    yazio_interval_minutes: int
 
     @classmethod
     def from_env(cls) -> Settings:
         token_file = os.getenv("STRAVA_TOKEN_FILE")
+        legacy_serve_interval = _int_env("HEALTH_SYNC_SERVE_INTERVAL_MINUTES", 180)
         return cls(
             db_path=Path(os.getenv("HEALTH_SYNC_DB_PATH", "/data/health-sync.sqlite3")),
             dry_run=_bool_env("HEALTH_SYNC_DRY_RUN", True),
@@ -72,5 +74,9 @@ class Settings:
             strava_token_expires_at=_int_env("STRAVA_TOKEN_EXPIRES_AT", 0),
             strava_token_file=Path(token_file) if token_file else Path("/data/strava-token.json"),
             strava_weight_threshold_kg=_float_env("STRAVA_WEIGHT_THRESHOLD_KG", 0.1),
-            serve_interval_minutes=_int_env("HEALTH_SYNC_SERVE_INTERVAL_MINUTES", 180),
+            zepp_cron=os.getenv("HEALTH_SYNC_ZEPP_CRON", "0 10 * * *"),
+            yazio_interval_minutes=_int_env(
+                "HEALTH_SYNC_YAZIO_INTERVAL_MINUTES",
+                legacy_serve_interval,
+            ),
         )

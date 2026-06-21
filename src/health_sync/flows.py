@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from prefect import flow, task
+from prefect.client.schemas.schedules import CronSchedule, IntervalSchedule
 
 from health_sync.adapters.garmin_mcp import GarminMcpClient
 from health_sync.adapters.strava import StravaClient
@@ -180,28 +181,35 @@ async def run_once_flow(dry_run: bool | None = None) -> list[SyncSummary]:
     return [zepp_garmin, zepp_strava, yazio_garmin]
 
 
-def serve_deployments() -> None:
-    settings = Settings.from_env()
-    from datetime import timedelta
-
-    from prefect import serve
-
-    interval = timedelta(minutes=settings.serve_interval_minutes)
-    serve(
+def scheduled_deployments(settings: Settings | None = None) -> tuple:
+    settings = settings or Settings.from_env()
+    zepp_schedule = CronSchedule(cron=settings.zepp_cron, timezone=settings.timezone)
+    yazio_schedule = IntervalSchedule(
+        interval=timedelta(minutes=settings.yazio_interval_minutes),
+        timezone=settings.timezone,
+    )
+    cleanup_schedule = CronSchedule(cron="17 3 * * *", timezone=settings.timezone)
+    return (
         sync_zepp_to_garmin_flow.to_deployment(
             name="sync-zepp-to-garmin",
-            interval=interval,
+            schedule=zepp_schedule,
         ),
         sync_zepp_weight_to_strava_flow.to_deployment(
             name="sync-zepp-weight-to-strava",
-            interval=interval,
+            schedule=zepp_schedule,
         ),
         sync_yazio_to_garmin_flow.to_deployment(
             name="sync-yazio-to-garmin",
-            interval=interval,
+            schedule=yazio_schedule,
         ),
         cleanup_sqlite_flow.to_deployment(
             name="cleanup-sqlite",
-            cron="17 3 * * *",
+            schedule=cleanup_schedule,
         ),
     )
+
+
+def serve_deployments() -> None:
+    from prefect import serve
+
+    serve(*scheduled_deployments())

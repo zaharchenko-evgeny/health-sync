@@ -31,3 +31,15 @@ health-sync serve
 ```
 
 Use `--no-dry-run` only after reviewing dry-run logs and SQLite events.
+
+## Production Schedule
+
+The VPS service runs `health-sync serve` with Prefect schedules:
+
+- Zepp to Garmin body composition: daily at 10:00 Europe/Berlin.
+- Zepp to Strava profile weight: daily at 10:00 Europe/Berlin.
+- Yazio to Garmin daily nutrition: every 3 hours.
+- SQLite cleanup: daily at 03:17 Europe/Berlin.
+
+Scheduled production writes require `HEALTH_SYNC_DRY_RUN=false` in the
+server-local `.env`.

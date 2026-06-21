@@ -118,6 +118,29 @@ Garmin MCP should expose these tools for sync and manual inspection:
 
 ## Flows
 
+### Production Schedule
+
+Prefect serves the scheduled flows inside the `health-sync` container. The
+server-local `.env` controls the cadence:
+
+```text
+HEALTH_SYNC_DRY_RUN=false
+HEALTH_SYNC_TIMEZONE=Europe/Berlin
+HEALTH_SYNC_ZEPP_CRON=0 10 * * *
+HEALTH_SYNC_YAZIO_INTERVAL_MINUTES=180
+```
+
+Production behavior:
+
+- `sync_zepp_to_garmin`: daily at 10:00 Europe/Berlin.
+- `sync_zepp_weight_to_strava`: daily at 10:00 Europe/Berlin.
+- `sync_yazio_to_garmin`: every 3 hours.
+- `cleanup_sqlite`: daily at 03:17 Europe/Berlin.
+
+The old `HEALTH_SYNC_SERVE_INTERVAL_MINUTES` setting is retained only as a
+fallback for `HEALTH_SYNC_YAZIO_INTERVAL_MINUTES`; Zepp scheduling is controlled
+by `HEALTH_SYNC_ZEPP_CRON`.
+
 ### `sync_zepp_to_garmin`
 
 Purpose: copy Zepp body measurements into Garmin.
@@ -263,9 +286,12 @@ Expected service properties:
 - Bind or volume mount for SQLite state.
 - Environment loaded from `/opt/mcp/health-sync/.env`.
 
-The service should run Prefect schedules or a lightweight entrypoint that starts the scheduled flows.
+The service runs Prefect schedules through `health-sync serve`.
 
 Set `PREFECT_HOME=/data/prefect` in the server-local `.env` so Prefect's local runtime state is stored in the mounted Docker volume instead of the container filesystem. The container also disables Prefect analytics/telemetry by default because this service uses a local temporary Prefect server rather than Prefect Cloud.
+
+Set `HEALTH_SYNC_DRY_RUN=false` in the server-local `.env` for production
+scheduled writes. Use CLI `--dry-run` only for manual smoke checks.
 
 When running ad hoc smoke commands inside the already-running `health-sync` container, use an isolated Prefect home so the manual command does not contend with the scheduler's temporary server:
 
@@ -322,7 +348,8 @@ This repository must contain only public-safe code and templates. Runtime secret
 7. Enable Zepp to Garmin body composition writes.
 8. Enable Zepp to Strava weight writes.
 9. Enable Yazio to Garmin daily nutrition writes.
-10. Review logs for one week before expanding backfill windows.
+10. Schedule Zepp daily at 10:00 and Yazio every 3 hours.
+11. Review logs for one week before expanding backfill windows.
 
 ## Open Decisions
 
