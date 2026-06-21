@@ -1,0 +1,27 @@
+name: deploy hermes vps
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Hermes VPS deploy
+        env:
+          HERMES_VPS_DISPATCH_TOKEN: ${{ secrets.HERMES_VPS_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.HERMES_VPS_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$HERMES_VPS_DISPATCH_TOKEN" ]; then
+            echo "HERMES_VPS_DISPATCH_TOKEN is not configured; skipping Hermes VPS dispatch."
+            exit 0
+          fi
+          gh api repos/zaharchenko-evgeny/hermes_vps/dispatches \
+            --method POST \
+            --field event_type=health-sync-updated \
+            --raw-field client_payload='{"services":"health-sync"}'
