@@ -265,6 +265,17 @@ Expected service properties:
 
 The service should run Prefect schedules or a lightweight entrypoint that starts the scheduled flows.
 
+Set `PREFECT_HOME=/data/prefect` in the server-local `.env` so Prefect's local runtime state is stored in the mounted Docker volume instead of the container filesystem.
+
+When running ad hoc smoke commands inside the already-running `health-sync` container, use an isolated Prefect home so the manual command does not contend with the scheduler's temporary server:
+
+```bash
+docker compose exec -T health-sync env PREFECT_HOME=/tmp/prefect-smoke health-sync zepp-garmin --dry-run
+docker compose exec -T health-sync env PREFECT_HOME=/tmp/prefect-smoke health-sync cleanup
+```
+
+Run these smoke commands sequentially, not in parallel. The sync audit SQLite database is safe to share, but Prefect's temporary server state can lock if multiple ad hoc flow runners use the same `PREFECT_HOME`.
+
 ## Auto-Redeploy On Push
 
 The existing VPS auto-update pattern should be extended for `health-sync`.
