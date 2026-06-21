@@ -1,0 +1,22 @@
+# Public-safe service snippet for /opt/mcp/docker-compose.yml.
+# Copy the service under `services:` and the volume under `volumes:`.
+
+services:
+  health-sync:
+    build:
+      context: ./health-sync
+    image: health-sync:local
+    container_name: health-sync
+    restart: unless-stopped
+    mem_limit: 512m
+    env_file:
+      - ./health-sync/.env
+    volumes:
+      - health-sync-data:/data
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - mcpnet
+
+volumes:
+  health-sync-data:
