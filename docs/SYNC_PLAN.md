@@ -127,19 +127,19 @@ server-local `.env` controls the cadence:
 HEALTH_SYNC_DRY_RUN=false
 HEALTH_SYNC_TIMEZONE=Europe/Berlin
 HEALTH_SYNC_ZEPP_CRON=0 10 * * *
-HEALTH_SYNC_YAZIO_INTERVAL_MINUTES=180
+HEALTH_SYNC_YAZIO_CRON=0 */3 * * *
 ```
 
 Production behavior:
 
 - `sync_zepp_to_garmin`: daily at 10:00 Europe/Berlin.
 - `sync_zepp_weight_to_strava`: daily at 10:00 Europe/Berlin.
-- `sync_yazio_to_garmin`: every 3 hours.
+- `sync_yazio_to_garmin`: every 3 hours via cron `0 */3 * * *`.
 - `cleanup_sqlite`: daily at 03:17 Europe/Berlin.
 
-The old `HEALTH_SYNC_SERVE_INTERVAL_MINUTES` setting is retained only as a
-fallback for `HEALTH_SYNC_YAZIO_INTERVAL_MINUTES`; Zepp scheduling is controlled
-by `HEALTH_SYNC_ZEPP_CRON`.
+The old `HEALTH_SYNC_YAZIO_INTERVAL_MINUTES` setting is retained only as a
+rollout fallback and is converted to a cron expression when possible. New
+configuration should use `HEALTH_SYNC_YAZIO_CRON`.
 
 ### `sync_zepp_to_garmin`
 

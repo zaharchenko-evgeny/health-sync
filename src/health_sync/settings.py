@@ -28,6 +28,34 @@ def _float_env(name: str, default: float) -> float:
     return float(value)
 
 
+def _interval_minutes_to_cron(minutes: int) -> str:
+    if minutes <= 0:
+        raise ValueError("Interval minutes must be positive.")
+    if minutes % 60 == 0:
+        hours = minutes // 60
+        if hours == 1:
+            return "0 * * * *"
+        if 24 % hours == 0:
+            return f"0 */{hours} * * *"
+    if minutes < 60 and 60 % minutes == 0:
+        return f"*/{minutes} * * * *"
+    raise ValueError(
+        "Cannot convert HEALTH_SYNC_YAZIO_INTERVAL_MINUTES to a stable cron expression; "
+        "set HEALTH_SYNC_YAZIO_CRON instead."
+    )
+
+
+def _cron_env(name: str, default: str, legacy_interval_name: str | None = None) -> str:
+    value = os.getenv(name)
+    if value:
+        return value
+    if legacy_interval_name:
+        legacy_value = os.getenv(legacy_interval_name)
+        if legacy_value:
+            return _interval_minutes_to_cron(int(legacy_value))
+    return default
+
+
 @dataclass(frozen=True)
 class Settings:
     db_path: Path
@@ -51,12 +79,11 @@ class Settings:
     strava_weight_threshold_kg: float
 
     zepp_cron: str
-    yazio_interval_minutes: int
+    yazio_cron: str
 
     @classmethod
     def from_env(cls) -> Settings:
         token_file = os.getenv("STRAVA_TOKEN_FILE")
-        legacy_serve_interval = _int_env("HEALTH_SYNC_SERVE_INTERVAL_MINUTES", 180)
         return cls(
             db_path=Path(os.getenv("HEALTH_SYNC_DB_PATH", "/data/health-sync.sqlite3")),
             dry_run=_bool_env("HEALTH_SYNC_DRY_RUN", True),
@@ -75,8 +102,9 @@ class Settings:
             strava_token_file=Path(token_file) if token_file else Path("/data/strava-token.json"),
             strava_weight_threshold_kg=_float_env("STRAVA_WEIGHT_THRESHOLD_KG", 0.1),
             zepp_cron=os.getenv("HEALTH_SYNC_ZEPP_CRON", "0 10 * * *"),
-            yazio_interval_minutes=_int_env(
-                "HEALTH_SYNC_YAZIO_INTERVAL_MINUTES",
-                legacy_serve_interval,
+            yazio_cron=_cron_env(
+                "HEALTH_SYNC_YAZIO_CRON",
+                "0 */3 * * *",
+                legacy_interval_name="HEALTH_SYNC_YAZIO_INTERVAL_MINUTES",
             ),
         )

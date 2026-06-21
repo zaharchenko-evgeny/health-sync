@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from prefect import flow, task
-from prefect.client.schemas.schedules import CronSchedule, IntervalSchedule
+from prefect.client.schemas.schedules import CronSchedule
 
 from health_sync.adapters.garmin_mcp import GarminMcpClient
 from health_sync.adapters.strava import StravaClient
@@ -184,10 +184,7 @@ async def run_once_flow(dry_run: bool | None = None) -> list[SyncSummary]:
 def scheduled_deployments(settings: Settings | None = None) -> tuple:
     settings = settings or Settings.from_env()
     zepp_schedule = CronSchedule(cron=settings.zepp_cron, timezone=settings.timezone)
-    yazio_schedule = IntervalSchedule(
-        interval=timedelta(minutes=settings.yazio_interval_minutes),
-        timezone=settings.timezone,
-    )
+    yazio_schedule = CronSchedule(cron=settings.yazio_cron, timezone=settings.timezone)
     cleanup_schedule = CronSchedule(cron="17 3 * * *", timezone=settings.timezone)
     return (
         sync_zepp_to_garmin_flow.to_deployment(

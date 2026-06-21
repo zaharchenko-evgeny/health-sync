@@ -38,7 +38,7 @@ The VPS service runs `health-sync serve` with Prefect schedules:
 
 - Zepp to Garmin body composition: daily at 10:00 Europe/Berlin.
 - Zepp to Strava profile weight: daily at 10:00 Europe/Berlin.
-- Yazio to Garmin daily nutrition: every 3 hours.
+- Yazio to Garmin daily nutrition: every 3 hours via `0 */3 * * *`.
 - SQLite cleanup: daily at 03:17 Europe/Berlin.
 
 Scheduled production writes require `HEALTH_SYNC_DRY_RUN=false` in the
