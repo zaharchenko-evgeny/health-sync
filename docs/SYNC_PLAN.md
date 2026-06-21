@@ -265,7 +265,7 @@ Expected service properties:
 
 The service should run Prefect schedules or a lightweight entrypoint that starts the scheduled flows.
 
-Set `PREFECT_HOME=/data/prefect` in the server-local `.env` so Prefect's local runtime state is stored in the mounted Docker volume instead of the container filesystem.
+Set `PREFECT_HOME=/data/prefect` in the server-local `.env` so Prefect's local runtime state is stored in the mounted Docker volume instead of the container filesystem. The container also disables Prefect analytics/telemetry by default because this service uses a local temporary Prefect server rather than Prefect Cloud.
 
 When running ad hoc smoke commands inside the already-running `health-sync` container, use an isolated Prefect home so the manual command does not contend with the scheduler's temporary server:
 

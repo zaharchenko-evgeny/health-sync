@@ -1,7 +1,11 @@
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    PREFECT_HOME=/data/prefect \
+    PREFECT_SERVER_ANALYTICS_ENABLED=false \
+    PREFECT_CLOUD_ENABLE_ORCHESTRATION_TELEMETRY=false \
+    PREFECT_TELEMETRY_ENABLE_RESOURCE_METRICS=false
 
 WORKDIR /app
 
@@ -12,6 +16,6 @@ COPY src ./src
 
 RUN uv pip install --system .
 
-RUN mkdir -p /data && chmod 700 /data
+RUN mkdir -p /data/prefect /root/.prefect && chmod 700 /data /data/prefect /root/.prefect
 
 CMD ["health-sync", "serve"]
