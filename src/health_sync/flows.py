@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from prefect import flow, task
 from prefect.client.schemas.schedules import CronSchedule
+from prefect.settings import PREFECT_API_URL, temporary_settings
 
 from health_sync.adapters.garmin_mcp import GarminMcpClient
 from health_sync.adapters.strava import StravaClient
@@ -253,47 +254,45 @@ def _stop_prefect_server(process: subprocess.Popen[bytes]) -> None:
 
 @contextmanager
 def _prefect_api_for_serving(settings: Settings) -> Iterator[str]:
-    if settings.prefect_api_url:
-        yield settings.prefect_api_url
-        return
-
-    api_url = _local_prefect_api_url(settings)
-    try:
-        _wait_for_prefect_api(api_url, process=None, timeout_seconds=2)
-        process = None
-    except TimeoutError:
-        env = os.environ.copy()
-        env["PREFECT_API_URL"] = api_url
-        env["PREFECT_SERVER_API_HOST"] = settings.prefect_server_host
-        env["PREFECT_SERVER_API_PORT"] = str(settings.prefect_server_port)
-        process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "prefect",
-                "server",
-                "start",
-                "--host",
-                settings.prefect_server_host,
-                "--port",
-                str(settings.prefect_server_port),
-                "--no-ui",
-                "--scheduler",
-                "--late-runs",
-                "--analytics-off",
-            ],
-            env=env,
-        )
-        _wait_for_prefect_api(
-            api_url,
-            process=process,
-            timeout_seconds=settings.prefect_server_startup_timeout_seconds,
-        )
+    api_url = settings.prefect_api_url or _local_prefect_api_url(settings)
+    process: subprocess.Popen[bytes] | None = None
+    if not settings.prefect_api_url:
+        try:
+            _wait_for_prefect_api(api_url, process=None, timeout_seconds=2)
+        except TimeoutError:
+            env = os.environ.copy()
+            env["PREFECT_API_URL"] = api_url
+            env["PREFECT_SERVER_API_HOST"] = settings.prefect_server_host
+            env["PREFECT_SERVER_API_PORT"] = str(settings.prefect_server_port)
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-m",
+                    "prefect",
+                    "server",
+                    "start",
+                    "--host",
+                    settings.prefect_server_host,
+                    "--port",
+                    str(settings.prefect_server_port),
+                    "--no-ui",
+                    "--scheduler",
+                    "--late-runs",
+                    "--analytics-off",
+                ],
+                env=env,
+            )
+            _wait_for_prefect_api(
+                api_url,
+                process=process,
+                timeout_seconds=settings.prefect_server_startup_timeout_seconds,
+            )
 
     previous_api_url = os.environ.get("PREFECT_API_URL")
     os.environ["PREFECT_API_URL"] = api_url
     try:
-        yield api_url
+        with temporary_settings(updates={PREFECT_API_URL: api_url}):
+            yield api_url
     finally:
         if previous_api_url is None:
             os.environ.pop("PREFECT_API_URL", None)

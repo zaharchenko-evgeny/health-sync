@@ -1,6 +1,13 @@
-from prefect.client.schemas.schedules import CronSchedule
+from dataclasses import replace
 
-from health_sync.flows import _local_prefect_api_url, scheduled_deployments
+from prefect.client.schemas.schedules import CronSchedule
+from prefect.settings import PREFECT_API_URL
+
+from health_sync.flows import (
+    _local_prefect_api_url,
+    _prefect_api_for_serving,
+    scheduled_deployments,
+)
 from health_sync.settings import Settings
 
 
@@ -61,3 +68,17 @@ def test_local_prefect_api_defaults_to_loopback_server(monkeypatch):
 
     assert settings.prefect_api_url is None
     assert _local_prefect_api_url(settings) == "http://127.0.0.1:4200/api"
+
+
+def test_prefect_api_context_updates_prefect_settings(monkeypatch):
+    monkeypatch.delenv("PREFECT_API_URL", raising=False)
+    settings = replace(
+        Settings.from_env(),
+        prefect_api_url="http://127.0.0.1:9999/api",
+    )
+
+    assert PREFECT_API_URL.value() is None
+    with _prefect_api_for_serving(settings) as api_url:
+        assert api_url == "http://127.0.0.1:9999/api"
+        assert PREFECT_API_URL.value() == "http://127.0.0.1:9999/api"
+    assert PREFECT_API_URL.value() is None
