@@ -43,3 +43,7 @@ The VPS service runs `health-sync serve` with Prefect schedules:
 
 Scheduled production writes require `HEALTH_SYNC_DRY_RUN=false` in the
 server-local `.env`.
+
+`health-sync serve` starts a local Prefect server with scheduler services when
+`PREFECT_API_URL` is not configured, then serves the deployments against that
+local API.

@@ -288,19 +288,27 @@ Expected service properties:
 
 The service runs Prefect schedules through `health-sync serve`.
 
-Set `PREFECT_HOME=/data/prefect` in the server-local `.env` so Prefect's local runtime state is stored in the mounted Docker volume instead of the container filesystem. The container also disables Prefect analytics/telemetry by default because this service uses a local temporary Prefect server rather than Prefect Cloud.
+Set `PREFECT_HOME=/data/prefect` in the server-local `.env` so Prefect's local runtime state is stored in the mounted Docker volume instead of the container filesystem. When `PREFECT_API_URL` is not set, `health-sync serve` starts a local Prefect server on `HEALTH_SYNC_PREFECT_SERVER_HOST` and `HEALTH_SYNC_PREFECT_SERVER_PORT`, waits for `/api/health`, and then serves the deployments against that scheduler-enabled API. The container disables Prefect analytics/telemetry by default.
+
+Default local Prefect server settings:
+
+```text
+HEALTH_SYNC_PREFECT_SERVER_HOST=127.0.0.1
+HEALTH_SYNC_PREFECT_SERVER_PORT=4200
+HEALTH_SYNC_PREFECT_SERVER_STARTUP_TIMEOUT_SECONDS=60
+```
 
 Set `HEALTH_SYNC_DRY_RUN=false` in the server-local `.env` for production
 scheduled writes. Use CLI `--dry-run` only for manual smoke checks.
 
-When running ad hoc smoke commands inside the already-running `health-sync` container, use an isolated Prefect home so the manual command does not contend with the scheduler's temporary server:
+When running ad hoc smoke commands inside the already-running `health-sync` container, use an isolated Prefect home so the manual command does not contend with the scheduler's local Prefect runtime state:
 
 ```bash
 docker compose exec -T health-sync env PREFECT_HOME=/tmp/prefect-smoke health-sync zepp-garmin --dry-run
 docker compose exec -T health-sync env PREFECT_HOME=/tmp/prefect-smoke health-sync cleanup
 ```
 
-Run these smoke commands sequentially, not in parallel. The sync audit SQLite database is safe to share, but Prefect's temporary server state can lock if multiple ad hoc flow runners use the same `PREFECT_HOME`.
+Run these smoke commands sequentially, not in parallel. The sync audit SQLite database is safe to share, but Prefect's local runtime state can lock if multiple ad hoc flow runners use the same `PREFECT_HOME`.
 
 ## Auto-Redeploy On Push
 

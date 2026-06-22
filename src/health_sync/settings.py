@@ -80,6 +80,10 @@ class Settings:
 
     zepp_cron: str
     yazio_cron: str
+    prefect_api_url: str | None
+    prefect_server_host: str
+    prefect_server_port: int
+    prefect_server_startup_timeout_seconds: int
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -106,5 +110,12 @@ class Settings:
                 "HEALTH_SYNC_YAZIO_CRON",
                 "0 */3 * * *",
                 legacy_interval_name="HEALTH_SYNC_YAZIO_INTERVAL_MINUTES",
+            ),
+            prefect_api_url=os.getenv("PREFECT_API_URL") or None,
+            prefect_server_host=os.getenv("HEALTH_SYNC_PREFECT_SERVER_HOST", "127.0.0.1"),
+            prefect_server_port=_int_env("HEALTH_SYNC_PREFECT_SERVER_PORT", 4200),
+            prefect_server_startup_timeout_seconds=_int_env(
+                "HEALTH_SYNC_PREFECT_SERVER_STARTUP_TIMEOUT_SECONDS",
+                60,
             ),
         )

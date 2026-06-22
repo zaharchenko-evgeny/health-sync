@@ -1,6 +1,6 @@
 from prefect.client.schemas.schedules import CronSchedule
 
-from health_sync.flows import scheduled_deployments
+from health_sync.flows import _local_prefect_api_url, scheduled_deployments
 from health_sync.settings import Settings
 
 
@@ -50,3 +50,14 @@ def test_scheduled_deployments_use_separate_zepp_and_yazio_schedules(monkeypatch
     assert isinstance(yazio_schedule, CronSchedule)
     assert yazio_schedule.cron == "0 */3 * * *"
     assert yazio_schedule.timezone == "Europe/Berlin"
+
+
+def test_local_prefect_api_defaults_to_loopback_server(monkeypatch):
+    monkeypatch.delenv("PREFECT_API_URL", raising=False)
+    monkeypatch.delenv("HEALTH_SYNC_PREFECT_SERVER_HOST", raising=False)
+    monkeypatch.delenv("HEALTH_SYNC_PREFECT_SERVER_PORT", raising=False)
+
+    settings = Settings.from_env()
+
+    assert settings.prefect_api_url is None
+    assert _local_prefect_api_url(settings) == "http://127.0.0.1:4200/api"

@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+import httpx
 from prefect import flow, task
 from prefect.client.schemas.schedules import CronSchedule
 
@@ -206,7 +213,99 @@ def scheduled_deployments(settings: Settings | None = None) -> tuple:
     )
 
 
+def _local_prefect_api_url(settings: Settings) -> str:
+    return f"http://{settings.prefect_server_host}:{settings.prefect_server_port}/api"
+
+
+def _wait_for_prefect_api(
+    api_url: str,
+    process: subprocess.Popen[bytes] | None,
+    timeout_seconds: int,
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    health_url = f"{api_url.rstrip('/')}/health"
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        if process is not None and process.poll() is not None:
+            raise RuntimeError(f"Prefect server exited early with code {process.returncode}.")
+        try:
+            response = httpx.get(health_url, timeout=2)
+            if response.status_code == 200:
+                return
+        except Exception as exc:
+            last_error = exc
+        time.sleep(1)
+    if last_error:
+        raise TimeoutError(f"Prefect API did not become healthy at {health_url}: {last_error}")
+    raise TimeoutError(f"Prefect API did not become healthy at {health_url}.")
+
+
+def _stop_prefect_server(process: subprocess.Popen[bytes]) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
+@contextmanager
+def _prefect_api_for_serving(settings: Settings) -> Iterator[str]:
+    if settings.prefect_api_url:
+        yield settings.prefect_api_url
+        return
+
+    api_url = _local_prefect_api_url(settings)
+    try:
+        _wait_for_prefect_api(api_url, process=None, timeout_seconds=2)
+        process = None
+    except TimeoutError:
+        env = os.environ.copy()
+        env["PREFECT_API_URL"] = api_url
+        env["PREFECT_SERVER_API_HOST"] = settings.prefect_server_host
+        env["PREFECT_SERVER_API_PORT"] = str(settings.prefect_server_port)
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "prefect",
+                "server",
+                "start",
+                "--host",
+                settings.prefect_server_host,
+                "--port",
+                str(settings.prefect_server_port),
+                "--no-ui",
+                "--scheduler",
+                "--late-runs",
+                "--analytics-off",
+            ],
+            env=env,
+        )
+        _wait_for_prefect_api(
+            api_url,
+            process=process,
+            timeout_seconds=settings.prefect_server_startup_timeout_seconds,
+        )
+
+    previous_api_url = os.environ.get("PREFECT_API_URL")
+    os.environ["PREFECT_API_URL"] = api_url
+    try:
+        yield api_url
+    finally:
+        if previous_api_url is None:
+            os.environ.pop("PREFECT_API_URL", None)
+        else:
+            os.environ["PREFECT_API_URL"] = previous_api_url
+        if process is not None:
+            _stop_prefect_server(process)
+
+
 def serve_deployments() -> None:
+    settings = Settings.from_env()
     from prefect import serve
 
-    serve(*scheduled_deployments())
+    with _prefect_api_for_serving(settings):
+        serve(*scheduled_deployments(settings))
